@@ -1,6 +1,22 @@
 export const ledTemplate = {
 
+  name: 'led',
+
+  keywords: [
+
+    'led',
+
+    'blink',
+
+    'light'
+  ],
+
   components: [
+
+    {
+      id: 'u1',
+      type: 'ESP32'
+    },
 
     {
       id: 'r1',
@@ -17,7 +33,7 @@ export const ledTemplate = {
   connections: [
 
     {
-      from: 'MCU.GPIO',
+      from: 'u1.GPIO2',
       to: 'r1.pin1'
     },
 
@@ -28,7 +44,7 @@ export const ledTemplate = {
 
     {
       from: 'd1.cathode',
-      to: 'MCU.GND'
+      to: 'u1.GND'
     }
   ]
 }

@@ -1,8 +1,18 @@
 import { useState } from 'react'
+
 import Groq from 'groq-sdk'
 
-import { SchematicView }
-from './components/renderer/SchematicView'
+import {
+
+  SchematicView
+
+} from './components/renderer/SchematicView'
+
+import {
+
+  buildCircuitFromTemplates
+
+} from './templates/templateEngine'
 
 import './App.css'
 
@@ -26,45 +36,6 @@ function App() {
     useState(null)
 
   /* =========================================
-     CLEAN AI RESPONSE
-  ========================================= */
-
-  const extractJSON = (text) => {
-
-    if (!text)
-      return null
-
-    let clean = text
-
-      .replace(/```json/g, '')
-
-      .replace(/```/g, '')
-
-      .trim()
-
-    const start =
-      clean.indexOf('{')
-
-    const end =
-      clean.lastIndexOf('}')
-
-    if (
-      start === -1 ||
-      end === -1
-    ) {
-
-      throw new Error(
-        'No valid JSON found'
-      )
-    }
-
-    clean =
-      clean.slice(start, end + 1)
-
-    return JSON.parse(clean)
-  }
-
-  /* =========================================
      GENERATE CIRCUIT
   ========================================= */
 
@@ -77,7 +48,22 @@ function App() {
 
     try {
 
+      /* ======================================
+         TEMPLATE ENGINE
+      ====================================== */
+
+      const circuit =
+
+        buildCircuitFromTemplates(
+          prompt
+        )
+
+      /* ======================================
+         AI CODE GENERATION
+      ====================================== */
+
       const completion =
+
         await groq.chat.completions.create({
 
           model:
@@ -90,140 +76,51 @@ function App() {
             {
               role: 'system',
 
-              content: `You are an electronics expert.
+              content: `You are an ESP32 and Arduino expert.
 
-Always respond with ONLY valid JSON.
+Generate ONLY valid code.
 
-Never include markdown.
+No markdown.
 
-Never include explanations.
+No explanations.
 
-Never include comments.
-
-Never include x/y coordinates.
-
-Use only supported component types.
-
-Code must use escaped newlines like \\n.`
+No extra text.`
             },
 
             {
               role: 'user',
 
-              content: `The user wants:
+              content: `Write code for:
 
 "${prompt}"
 
-Return ONLY this JSON format:
-
-{
-  "components": [
-    {
-      "id": "u1",
-      "type": "ESP32"
-    }
-  ],
-
-  "connections": [
-    {
-      "from": "u1.GPIO2",
-      "to": "d1.anode"
-    }
-  ],
-
-  "code": "void setup() {\\n}"
-
-}
-
-Allowed components:
-ESP32
-Arduino
-LED
-Resistor
-Button
-Buzzer
-DHT11
-Sensor
-OLED
-Relay
-
-ESP32 pins:
-GPIO2
-GPIO4
-GPIO5
-GPIO12
-GPIO13
-GPIO14
-GPIO15
-GND
-VIN
-3V3
-
-LED pins:
-anode
-cathode
-
-Resistor pins:
-pin1
-pin2
-
-Button pins:
-pin1
-pin2
-
-DHT11 pins:
-VCC
-DATA
-GND
-
-Relay pins:
-VCC
-GND
-IN
-COM
-NO
-NC
-
-OLED pins:
-VCC
-GND
-SCL
-SDA`
+Using ESP32.`
             }
           ]
         })
 
-      const raw =
+      const rawCode =
+
         completion.choices[0]
         ?.message
-        ?.content
+        ?.content || ''
+
+      circuit.code =
+
+        rawCode
+
+          .replace(/```cpp/g, '')
+
+          .replace(/```/g, '')
+
+          .trim()
 
       console.log(
-        'RAW AI RESPONSE:',
-        raw
+        'TEMPLATE CIRCUIT:',
+        circuit
       )
 
-      const parsed =
-        extractJSON(raw)
-
-      /* code formatting */
-
-      if (parsed.code) {
-
-        parsed.code =
-          parsed.code
-
-            .replace(/\\n/g, '\n')
-
-            .replace(/\\t/g, '\t')
-      }
-
-      console.log(
-        'PARSED:',
-        parsed
-      )
-
-      setResponse(parsed)
+      setResponse(circuit)
 
     } catch (error) {
 
@@ -233,7 +130,7 @@ SDA`
       )
 
       alert(
-        'AI returned invalid data. Check console.'
+        'Generation failed.'
       )
     }
 
@@ -299,6 +196,7 @@ SDA`
         >
 
           {
+
             loading
 
               ? 'Generating...'

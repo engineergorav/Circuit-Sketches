@@ -1,3 +1,31 @@
+import {
+
+  COMPONENT_LIBRARY
+
+} from '../library/index.js'
+
+/* =========================================
+   HELPERS
+========================================= */
+
+const getRole = (type) => {
+
+  const component =
+    COMPONENT_LIBRARY[type]
+
+  if (!component)
+    return 'misc'
+
+  return (
+    component.category ||
+    'misc'
+  )
+}
+
+/* =========================================
+   AUTO LAYOUT ENGINE
+========================================= */
+
 export const autoLayout = (
 
   components,
@@ -8,92 +36,73 @@ export const autoLayout = (
   const positions = {}
 
   /* ======================================
-     ROLE SYSTEM
-  ====================================== */
-
-  const getRole = (type) => {
-
-    if (
-      type === 'ESP32' ||
-      type === 'Arduino'
-    ) return 'mcu'
-
-    if (
-      type === 'Button' ||
-      type === 'DHT11' ||
-      type === 'Sensor'
-    ) return 'input'
-
-    if (
-      type === 'Resistor'
-    ) return 'passive'
-
-    return 'output'
-  }
-
-  /* ======================================
      FIND MCU
   ====================================== */
 
-  const mcu = components.find(
+  const mcu =
 
-    c =>
-      getRole(c.type) === 'mcu'
-  )
+    components.find(
+
+      c =>
+
+        c.type === 'ESP32' ||
+
+        c.type === 'Arduino'
+    )
 
   if (!mcu)
     return positions
 
   /* ======================================
-     PLACE MCU
+     PLACE MCU CENTER
   ====================================== */
 
   positions[mcu.id] = {
 
-    x: 220,
+    x: 320,
 
-    y: 300
+    y: 260
   }
 
   /* ======================================
-     HELPERS
+     BUILD CONNECTION MAP
   ====================================== */
 
-  const findComponent = (id) => {
+  const connectedMap = {}
 
-    return components.find(
-      c => c.id === id
-    )
-  }
+  connections.forEach((conn) => {
 
-  const getConnectedComponents = (id) => {
+    const [fromComp] =
+      conn.from.split('.')
 
-    return connections.map(conn => {
+    const [toComp] =
+      conn.to.split('.')
 
-      const fromId =
-        conn.from.split('.')[0]
+    if (!connectedMap[fromComp]) {
 
-      const toId =
-        conn.to.split('.')[0]
+      connectedMap[fromComp] = []
+    }
 
-      if (fromId === id)
-        return toId
+    if (!connectedMap[toComp]) {
 
-      if (toId === id)
-        return fromId
+      connectedMap[toComp] = []
+    }
 
-      return null
+    connectedMap[fromComp]
+      .push(toComp)
 
-    }).filter(Boolean)
-  }
+    connectedMap[toComp]
+      .push(fromComp)
+  })
 
   /* ======================================
-     PLACE OUTPUT CHAINS
+     PLACE CONNECTED COMPONENTS
   ====================================== */
 
-  let currentY = 280
+  let leftY  = 180
+  let rightY = 180
 
-  components.forEach(comp => {
+  components.forEach((comp) => {
 
     if (comp.id === mcu.id)
       return
@@ -101,66 +110,108 @@ export const autoLayout = (
     const role =
       getRole(comp.type)
 
+    const connectedToMCU =
+
+      connections.some((conn) => {
+
+        return (
+
+          conn.from.startsWith(
+            mcu.id
+          ) &&
+
+          conn.to.startsWith(
+            comp.id
+          )
+
+        ) ||
+
+        (
+
+          conn.to.startsWith(
+            mcu.id
+          ) &&
+
+          conn.from.startsWith(
+            comp.id
+          )
+        )
+      })
+
     /* ====================================
-       PASSIVES
+       INPUTS LEFT
     ==================================== */
 
-    if (role === 'passive') {
+    if (
+
+      role === 'input' ||
+
+      role === 'sensor'
+    ) {
+
+      positions[comp.id] = {
+
+        x: 120,
+
+        y: leftY
+      }
+
+      leftY += 140
+
+      return
+    }
+
+    /* ====================================
+       PASSIVES CENTER-RIGHT
+    ==================================== */
+
+    if (
+
+      role === 'passive'
+    ) {
 
       positions[comp.id] = {
 
         x: 520,
 
-        y: currentY
+        y: 240
       }
 
       return
     }
 
     /* ====================================
-       OUTPUTS
+       OUTPUTS RIGHT
     ==================================== */
 
-    if (role === 'output') {
+    if (
 
-      const connected =
-        getConnectedComponents(comp.id)
+      role === 'output' ||
 
-      const hasResistor =
-        connected.some(id => {
-
-          const c =
-            findComponent(id)
-
-          return c?.type === 'Resistor'
-        })
+      role === 'display'
+    ) {
 
       positions[comp.id] = {
 
-        x: hasResistor
-          ? 760
-          : 520,
+        x: 720,
 
-        y: currentY
+        y: rightY
       }
 
-      currentY += 180
+      rightY += 140
+
+      return
     }
 
     /* ====================================
-       INPUTS
+       DEFAULT
     ==================================== */
 
-    if (role === 'input') {
+    positions[comp.id] = {
 
-      positions[comp.id] = {
+      x: 600,
 
-        x: 40,
-
-        y: currentY
-      }
-
-      currentY += 180
+      y: 300
     }
   })
 
